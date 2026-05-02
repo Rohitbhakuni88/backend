@@ -2,8 +2,6 @@ package com.taskmanager.backend.controller;
 
 import com.taskmanager.backend.repository.UserRepository;
 import com.taskmanager.backend.service.JwtService;
-import lombok.AllArgsConstructor;
-import lombok.Data;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -17,7 +15,7 @@ public class AuthController {
     private final JwtService jwtService;
     private final UserRepository userRepository;
 
-    // --- MANUAL CONSTRUCTOR ---
+    // Manual constructor for safety given the Java 24 environment
     public AuthController(AuthenticationManager authenticationManager, JwtService jwtService, UserRepository userRepository) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
@@ -26,23 +24,23 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
+        // NOTE: Records use field names as methods (email() instead of getEmail())
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(request.email(), request.password())
         );
-        var user = userRepository.findByEmail(request.getEmail()).orElseThrow();
+
+        var user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new RuntimeException("Authentication failed: User not found"));
+
         var jwtToken = jwtService.generateToken(user);
         return ResponseEntity.ok(new AuthResponse(jwtToken));
     }
 
-    @Data
-    public static class AuthRequest {
-        private String email;
-        private String password;
-    }
+    /**
+     * Using Records avoids the "Cannot find symbol" errors caused by Lombok/Java 24 conflicts.
+     * Records automatically provide constructors, getters, equals, hashCode, and toString.
+     */
+    public record AuthRequest(String email, String password) {}
 
-    @Data
-    @AllArgsConstructor
-    public static class AuthResponse {
-        private String token;
-    }
+    public record AuthResponse(String token) {}
 }

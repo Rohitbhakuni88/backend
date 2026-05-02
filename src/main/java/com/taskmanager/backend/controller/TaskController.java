@@ -5,6 +5,7 @@ import com.taskmanager.backend.enums.TaskStatus;
 import com.taskmanager.backend.service.TaskService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,12 +17,13 @@ public class TaskController {
 
     private final TaskService taskService;
 
-    // 1. CREATE: Saves a task and returns a string to avoid JSON recursion crashes
+    // 1. CREATE: Should return the created object safely
     @PostMapping
     public ResponseEntity<?> createTask(@RequestBody Task task) {
         try {
-            taskService.createTask(task);
-            return ResponseEntity.ok("Task created successfully");
+            // Service should return the saved Task (with its new ID)
+            Task savedTask = taskService.createTask(task);
+            return ResponseEntity.ok(savedTask);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Backend Error: " + e.getMessage());
         }
@@ -33,13 +35,12 @@ public class TaskController {
         return taskService.getTasksByProject(projectId);
     }
 
-    // 3. UPDATE: Changes status (PENDING, IN_PROGRESS, COMPLETED)
+    // 3. UPDATE: Both Admins and Members can update task status
     @PutMapping("/{taskId}/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MEMBER')") // <--- ADDED: Explicitly allowing both roles
     public ResponseEntity<?> updateTaskStatus(@PathVariable Long taskId, @RequestParam String status) {
         try {
-            // Convert String to Enum (e.g., "pending" -> TaskStatus.PENDING)
             TaskStatus taskStatus = TaskStatus.valueOf(status.toUpperCase());
-
             taskService.updateTaskStatus(taskId, taskStatus);
             return ResponseEntity.ok("Status updated to " + status.toUpperCase());
         } catch (IllegalArgumentException e) {
@@ -49,8 +50,9 @@ public class TaskController {
         }
     }
 
-    // 4. DELETE: Removes a task
+    // 4. DELETE: Removes a task (SECURED)
     @DeleteMapping("/{taskId}")
+    @PreAuthorize("hasRole('ADMIN')") // <--- REMAINS SECURE: Only Admins can delete
     public ResponseEntity<?> deleteTask(@PathVariable Long taskId) {
         try {
             taskService.deleteTask(taskId);

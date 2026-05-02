@@ -1,6 +1,7 @@
 package com.taskmanager.backend.entity;
 
 import com.taskmanager.backend.enums.TaskStatus;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
@@ -31,16 +32,16 @@ public class Task {
     // Requirement: Dashboard (tasks, status, overdue)
     private LocalDate dueDate;
 
-    // Requirement: Proper validations & relationships
+    // --- CRITICAL FIX: Pairs exactly with the Project entity to stop infinite recursion ---
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)
-    @JsonIgnoreProperties("tasks") // Prevents infinite recursion back to project
+    @JsonBackReference
     private Project project;
 
     // Requirement: Team Management (Assignment)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_to")
-    @JsonIgnoreProperties({"projects", "password", "authorities"}) // Security: Don't send passwords to frontend
+    @JsonIgnoreProperties({"projects", "password", "authorities"}) // Excellent security practice here!
     private User assignedTo;
 
     @Column(updatable = false)
