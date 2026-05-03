@@ -23,10 +23,11 @@ public class Project {
 
     private String description;
 
-    // A project must be created by a user
+    // --- FIX: Renamed 'createdBy' to 'user' ---
+    // Lombok will now successfully generate the getUser() method
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
-    private User createdBy;
+    private User user;
 
     // --- CRITICAL ADDITION: Fixes JSON recursion and links Tasks to the Project ---
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)

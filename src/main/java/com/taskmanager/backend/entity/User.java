@@ -32,7 +32,9 @@ public class User implements UserDetails {
     @Enumerated(EnumType.STRING)
     private Role role;
 
-    @OneToMany(mappedBy = "createdBy", cascade = CascadeType.ALL)
+    // --- THE FIX IS HERE ---
+    // Changed mappedBy from "createdBy" to "user" to match Project.java
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     @ToString.Exclude
     private List<Project> projects;
@@ -44,7 +46,7 @@ public class User implements UserDetails {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 
-    // FIX: Explicitly override getPassword to satisfy the compiler
+    // Explicitly override getPassword to satisfy the compiler
     @Override
     public String getPassword() {
         return this.password;

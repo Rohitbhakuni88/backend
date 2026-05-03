@@ -15,7 +15,6 @@ public class AuthController {
     private final JwtService jwtService;
     private final UserRepository userRepository;
 
-    // Manual constructor for safety given the Java 24 environment
     public AuthController(AuthenticationManager authenticationManager, JwtService jwtService, UserRepository userRepository) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
@@ -24,7 +23,6 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
-        // NOTE: Records use field names as methods (email() instead of getEmail())
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password())
         );
@@ -33,14 +31,17 @@ public class AuthController {
                 .orElseThrow(() -> new RuntimeException("Authentication failed: User not found"));
 
         var jwtToken = jwtService.generateToken(user);
-        return ResponseEntity.ok(new AuthResponse(jwtToken));
+
+        // --- UPDATED: Passing token, role, and ID to the response ---
+        return ResponseEntity.ok(new AuthResponse(
+                jwtToken,
+                user.getRole().name(),
+                user.getId()
+        ));
     }
 
-    /**
-     * Using Records avoids the "Cannot find symbol" errors caused by Lombok/Java 24 conflicts.
-     * Records automatically provide constructors, getters, equals, hashCode, and toString.
-     */
     public record AuthRequest(String email, String password) {}
 
-    public record AuthResponse(String token) {}
+    // --- UPDATED: Added role and id fields to the AuthResponse record ---
+    public record AuthResponse(String token, String role, Long id) {}
 }
