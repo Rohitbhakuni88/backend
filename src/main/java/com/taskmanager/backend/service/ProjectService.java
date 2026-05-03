@@ -1,7 +1,9 @@
 package com.taskmanager.backend.service;
 
 import com.taskmanager.backend.entity.Project;
+import com.taskmanager.backend.entity.User;
 import com.taskmanager.backend.repository.ProjectRepository;
+import com.taskmanager.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -14,10 +16,11 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
 
+    // --- NEW: Inject the UserRepository to find members ---
+    private final UserRepository userRepository;
+
     // 1. CREATE
     public Project createProject(Project project) {
-        // Tip: You might also want to automatically set the project's user here
-        // based on the SecurityContextHolder so the frontend doesn't have to send it.
         return projectRepository.save(project);
     }
 
@@ -32,22 +35,52 @@ public class ProjectService {
                 .orElseThrow(() -> new RuntimeException("Project not found with id: " + id));
     }
 
-    // 4. DELETE (Secured against IDOR)
+    // 4. DELETE (Secured: Admin Override + Owner IDOR Check)
     public void deleteProject(Long id) {
-        // Step 1: Fetch the project from the database
         Project project = getProjectById(id);
 
-        // Step 2: Extract the currently authenticated user from the JWT context
-        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = authentication.getName();
 
-        // Step 3: Verify Ownership
-        // IMPORTANT: Ensure your Project entity has a relationship mapped to the User entity.
-        // Change '.getUser().getEmail()' if your fields are named differently (e.g., getOwner(), getUsername()).
-        if (project.getUser() == null || !project.getUser().getEmail().equals(currentUsername)) {
+        // Check if the current user has Admin privileges
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN") || auth.getAuthority().equals("ADMIN"));
+
+        // Allow deletion IF the user is an Admin OR the user is the creator of the project.
+        if (!isAdmin && (project.getUser() == null || !project.getUser().getEmail().equals(currentUsername))) {
             throw new RuntimeException("Unauthorized: You do not have permission to delete this project");
         }
 
-        // Step 4: Execute the deletion only after passing the security check
         projectRepository.delete(project);
+    }
+
+    // ==========================================
+    // 5. MEMBER MANAGEMENT (Admin Features)
+    // ==========================================
+
+    public Project addMemberToProject(Long projectId, Long userId) {
+        Project project = getProjectById(projectId); // Reuse our existing read method
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+
+        // Prevent duplicate entries in the Many-to-Many table
+        if (!project.getMembers().contains(user)) {
+            project.getMembers().add(user);
+            return projectRepository.save(project);
+        }
+
+        return project; // User was already a member
+    }
+
+    public Project removeMemberFromProject(Long projectId, Long userId) {
+        Project project = getProjectById(projectId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+
+        // Remove the user from the list
+        project.getMembers().remove(user);
+        return projectRepository.save(project);
     }
 }

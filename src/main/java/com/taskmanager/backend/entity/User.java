@@ -29,10 +29,13 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String password;
 
+    // --- THE FIX: Secure default role ---
+    // Forces all new registrations to default to MEMBER at the database level
     @Enumerated(EnumType.STRING)
-    private Role role;
+    @Column(nullable = false)
+    @Builder.Default
+    private Role role = Role.MEMBER;
 
-    // --- THE FIX IS HERE ---
     // Changed mappedBy from "createdBy" to "user" to match Project.java
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore

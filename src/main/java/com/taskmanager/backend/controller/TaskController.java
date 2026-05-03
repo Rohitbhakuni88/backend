@@ -17,36 +17,46 @@ public class TaskController {
 
     private final TaskService taskService;
 
-    // 1. CREATE: Should return the created object safely
-    @PostMapping
-    public ResponseEntity<?> createTask(@RequestBody Task task) {
+    // 1. CREATE: Admin Only - Creates a task inside a project and assigns it to a user
+    @PostMapping("/project/{projectId}/assign/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> createTask(
+            @PathVariable Long projectId,
+            @PathVariable Long userId,
+            @RequestBody Task task) {
         try {
-            // Service should return the saved Task (with its new ID)
-            Task savedTask = taskService.createTask(task);
+            Task savedTask = taskService.createTask(projectId, userId, task);
             return ResponseEntity.ok(savedTask);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Backend Error: " + e.getMessage());
+            return ResponseEntity.status(500).body("Error creating task: " + e.getMessage());
         }
     }
 
     // 2. READ: Fetches all tasks for a specific project
     @GetMapping("/project/{projectId}")
-    public List<Task> getTasksByProject(@PathVariable Long projectId) {
-        return taskService.getTasksByProject(projectId);
+    public ResponseEntity<?> getTasksByProject(@PathVariable Long projectId) {
+        try {
+            List<Task> tasks = taskService.getTasksByProject(projectId);
+            return ResponseEntity.ok(tasks);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching tasks: " + e.getMessage());
+        }
     }
 
-    // 3. UPDATE: Both Admins and Members can update task status
+    // 3. UPDATE: Service layer checks if the user is an Admin or the Task Owner
     @PutMapping("/{taskId}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MEMBER')") // <--- ADDED: Explicitly allowing both roles
-    public ResponseEntity<?> updateTaskStatus(@PathVariable Long taskId, @RequestParam String status) {
+    public ResponseEntity<?> updateTaskStatus(
+            @PathVariable Long taskId,
+            @RequestParam String status) {
         try {
             TaskStatus taskStatus = TaskStatus.valueOf(status.toUpperCase());
-            taskService.updateTaskStatus(taskId, taskStatus);
-            return ResponseEntity.ok("Status updated to " + status.toUpperCase());
+            Task updatedTask = taskService.updateTaskStatus(taskId, taskStatus);
+            return ResponseEntity.ok(updatedTask);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body("Invalid status. Use PENDING, IN_PROGRESS, or COMPLETED.");
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error updating status: " + e.getMessage());
+            // If the Service throws an "Access Denied" error, it gets caught here!
+            return ResponseEntity.status(403).body(e.getMessage());
         }
     }
 
